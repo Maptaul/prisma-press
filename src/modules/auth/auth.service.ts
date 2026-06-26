@@ -4,7 +4,6 @@ import config from "../../config";
 import { prisma } from "../../lib/prisma";
 import { jwtUtils } from "../../utils/jwt";
 import { ILoginUser } from "./auth.interface";
-import  statusCode  from 'http-status';
 
 const loginUser = async (payload: ILoginUser) => {
   const { email, password } = payload;
@@ -21,12 +20,12 @@ const loginUser = async (payload: ILoginUser) => {
 
   if (user.activeStatus === "BLOCKED") {
     throw new Error("User is blocked. Please contact support.");
-    }
+  }
 
   const isPasswordMatched = await bcrypt.compare(password, user.password);
   if (!isPasswordMatched) {
     throw new Error("Password is incorrect");
-  } 
+  }
 
   const jwtPayload = {
     id: user.id,
