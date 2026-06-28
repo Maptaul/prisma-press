@@ -1,4 +1,4 @@
-import { CommentStatus } from "../../../generated/prisma/enums";
+import { CommentStatus, PostStatus } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { iCreatePostPayload, IUpdatePostPayload } from "./post.interface";
 
@@ -26,7 +26,63 @@ const getAllPosts = async () => {
   return posts;
 };
 
-const getPostStats = () => {};
+const getPostStats = async () => {
+  const transactionResult = prisma.$transaction(async (tx) => {
+    const totalPosts = await tx.post.count();
+    const totalPublishedPosts = await tx.post.count({
+      where: {
+        status: PostStatus.PUBLISHED,
+      },
+    });
+    const totalDraftPosts = await tx.post.count({
+      where: {
+        status: PostStatus.DRAFT,
+      },
+    });
+    const totalArchivedPosts = await tx.post.count({
+      where: {
+        status: PostStatus.ARCHIVED,
+      },
+    });
+    const totalComments = await tx.comments.count();
+    const totalApprovedComments = await tx.comments.count({
+      where: {
+        status: CommentStatus.APPROVED,
+      },
+    });
+    const totalRejectedComments = await tx.comments.count({
+      where: {
+        status: CommentStatus.REJECTED,
+      },
+    });
+
+    //not a good approach to calculate total post views, but for now we will use this approach
+    // const allPost = await tx.post.findMany();
+    // let totalPostViews = 0;
+    // allPost.forEach((post) => {
+    //   totalPostViews += post.views;
+    // });
+    //good approach to calculate total post views using aggregate function
+    const totalPostViewsAggregate = await tx.post.aggregate({
+      _sum: {
+        views: true,
+      },
+    });
+    const totalPostViews = totalPostViewsAggregate._sum.views;
+
+    return {
+      totalPosts,
+      totalPublishedPosts,
+      totalDraftPosts,
+      totalArchivedPosts,
+      totalComments,
+      totalApprovedComments,
+      totalRejectedComments,
+      totalPostViews,
+    };
+  });
+  return transactionResult;
+};
 
 const getMyPosts = async (authorId: string) => {
   const result = await prisma.post.findMany({
