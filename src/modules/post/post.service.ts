@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma";
-import { iCreatePostPayload } from "./post.interface";
+import { iCreatePostPayload, IUpdatePostPayload } from "./post.interface";
 
 const createPost = async (payload: iCreatePostPayload, userId: string) => {
   const result = await prisma.post.create({
@@ -78,10 +78,57 @@ const getPostById = async (postId: string) => {
   });
   return updatedPost;
 };
+ 
+const updatePost = async (
+  postId: string,
+  payload: IUpdatePostPayload,
+  authorId: string,
+  isAdmin: boolean,
+) => {
+  const post = await prisma.post.findUniqueOrThrow({
+    where: {
+      id: postId,
+    },
+  });
+  if (!isAdmin && post.authorId !== authorId) {
+    throw new Error("You are not authorized to update this post");
+  }
+  const result = await prisma.post.update({
+    where: {
+      id: postId,
+    },
+    data: payload,
+    include: {
+      author: {
+        omit: {
+          password: true,
+        },
+      },
+      comments: true,
+    },
+  });
+  return result;
+};
 
-const updatePost = () => {};
-
-const deletePost = () => {};
+const deletePost = async (
+  postId: string,
+  authorId: string,
+  isAdmin: boolean,
+) => {
+  const post = await prisma.post.findUniqueOrThrow({
+    where: {
+      id: postId,
+    },
+  });
+  if (!isAdmin && post.authorId !== authorId) {
+    throw new Error("You are not authorized to delete this post");
+  }
+  await prisma.post.delete({
+    where: {
+      id: postId,
+    },
+  });
+};
 
 export const postService = {
   createPost,
