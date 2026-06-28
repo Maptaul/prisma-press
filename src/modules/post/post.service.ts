@@ -1,4 +1,4 @@
-import { CommentStatus } from "../../../generated/prisma/client";
+import { CommentStatus } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { iCreatePostPayload, IUpdatePostPayload } from "./post.interface";
 
@@ -59,45 +59,88 @@ const getPostById = async (postId: string) => {
   //     id: postId,
   //   },
   // });
-  await prisma.post.update({
-    where: {
-      id: postId,
-    },
-    data: {
-      views: {
-        increment: 1,
-      },
-    },
-  });
+  // await prisma.post.update({
+  //   where: {
+  //     id: postId,
+  //   },
+  //   data: {
+  //     views: {
+  //       increment: 1,
+  //     },
+  //   },
+  // });
 
-  // throw new Error("Fake error to test error handling middleware");
+  // // throw new Error("Fake error to test error handling middleware");
 
-  const post = await prisma.post.findUniqueOrThrow({
-    where: {
-      id: postId,
-    },
-    include: {
-      author: {
-        omit: {
-          password: true,
+  // const post = await prisma.post.findUniqueOrThrow({
+  //   where: {
+  //     id: postId,
+  //   },
+  //   include: {
+  //     author: {
+  //       omit: {
+  //         password: true,
+  //       },
+  //     },
+  //     comments: {
+  //       where: {
+  //         status: CommentStatus.APPROVED,
+  //       },
+  //       orderBy: {
+  //         createdAt: "desc",
+  //       },
+  //     },
+  //     _count: {
+  //       select: {
+  //         comments: true,
+  //       },
+  //     },
+  //   },
+  // });
+  // return post;
+
+  const transactionResult = await prisma.$transaction(async (tx) => {
+    await tx.post.update({
+      where: {
+        id: postId,
+      },
+      data: {
+        views: {
+          increment: 1,
         },
       },
-      comments: {
-        where: {
-          status: CommentStatus.APPROVED,
+    });
+
+    // throw new Error("Fake error to test error handling middleware");
+
+    const post = await tx.post.findUniqueOrThrow({
+      where: {
+        id: postId,
+      },
+      include: {
+        author: {
+          omit: {
+            password: true,
+          },
         },
-        orderBy: {
-          createdAt: "desc",
+        comments: {
+          where: {
+            status: CommentStatus.APPROVED,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+          },
         },
       },
-      _count: {
-        select: {
-          comments: true,
-        },
-      },
-    },
+    });
+    return post;
   });
-  return post;
+  return transactionResult;
 };
 
 const updatePost = async (
