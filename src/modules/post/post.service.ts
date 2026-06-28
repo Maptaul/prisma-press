@@ -27,48 +27,50 @@ const getAllPosts = async () => {
 };
 
 const getPostStats = async () => {
-  const transactionResult = prisma.$transaction(async (tx) => {
-    const totalPosts = await tx.post.count();
-    const totalPublishedPosts = await tx.post.count({
-      where: {
-        status: PostStatus.PUBLISHED,
-      },
-    });
-    const totalDraftPosts = await tx.post.count({
-      where: {
-        status: PostStatus.DRAFT,
-      },
-    });
-    const totalArchivedPosts = await tx.post.count({
-      where: {
-        status: PostStatus.ARCHIVED,
-      },
-    });
-    const totalComments = await tx.comments.count();
-    const totalApprovedComments = await tx.comments.count({
-      where: {
-        status: CommentStatus.APPROVED,
-      },
-    });
-    const totalRejectedComments = await tx.comments.count({
-      where: {
-        status: CommentStatus.REJECTED,
-      },
-    });
-
-    //not a good approach to calculate total post views, but for now we will use this approach
-    // const allPost = await tx.post.findMany();
-    // let totalPostViews = 0;
-    // allPost.forEach((post) => {
-    //   totalPostViews += post.views;
-    // });
-    //good approach to calculate total post views using aggregate function
-    const totalPostViewsAggregate = await tx.post.aggregate({
-      _sum: {
-        views: true,
-      },
-    });
-    const totalPostViews = totalPostViewsAggregate._sum.views;
+  const transactionResult = await prisma.$transaction(async (tx) => {
+    const [
+      totalPosts,
+      totalPublishedPosts,
+      totalDraftPosts,
+      totalArchivedPosts,
+      totalComments,
+      totalApprovedComments,
+      totalRejectedComments,
+      totalPostViewsAggregate,
+    ] = await Promise.all([
+      tx.post.count(),
+      tx.post.count({
+        where: {
+          status: PostStatus.PUBLISHED,
+        },
+      }),
+      tx.post.count({
+        where: {
+          status: PostStatus.DRAFT,
+        },
+      }),
+      tx.post.count({
+        where: {
+          status: PostStatus.ARCHIVED,
+        },
+      }),
+      tx.comments.count(),
+      tx.comments.count({
+        where: {
+          status: CommentStatus.APPROVED,
+        },
+      }),
+      tx.comments.count({
+        where: {
+          status: CommentStatus.REJECTED,
+        },
+      }),
+      tx.post.aggregate({
+        _sum: {
+          views: true,
+        },
+      }),
+    ]);
 
     return {
       totalPosts,
@@ -78,9 +80,10 @@ const getPostStats = async () => {
       totalComments,
       totalApprovedComments,
       totalRejectedComments,
-      totalPostViews,
+      totalPostViews: totalPostViewsAggregate._sum.views ?? 0,
     };
   });
+
   return transactionResult;
 };
 
