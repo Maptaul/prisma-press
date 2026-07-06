@@ -12,3 +12,4 @@ model Subscription {
 
   @@map("subscriptions")
 }
+ 
