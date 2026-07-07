@@ -20,6 +20,23 @@ const checkoutSession = catchAsync(
   },
 );
 
+const handleWebhook = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const event = req.body as Buffer;
+    const signature = req.headers["stripe-signature"] as string;
+
+    await subscriptionServices.handleWebhook(event, signature as string);
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Webhook received successfully",
+      data: null,
+    });
+  },
+);
+
 export const subscriptionController = {
   checkoutSession,
+  handleWebhook,
 };

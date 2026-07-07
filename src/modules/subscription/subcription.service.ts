@@ -42,6 +42,30 @@ const createCheckoutSession = async (userId: string) => {
   return { paymentUrl: transactionResult };
 };
 
+const handleWebhook = async (payload: Buffer, signature: string) => {
+  const endpointSecret = config.stripe_webhook_secret;
+  const event = stripe.webhooks.constructEvent(
+    payload,
+    signature,
+    endpointSecret,
+  );
+  switch (event.type) {
+    case "checkout.session.completed":
+      //occurs when the checkout session is completed successfully
+      break;
+    case "customer.subscription.updated":
+      //occurs when the subscription is changed, for example when switching from one plan to another
+      break;
+    case "customer.subscription.deleted":
+      //occurs when the subscription is canceled
+      break;
+    default:
+      console.log(`Unhandled event type ${event.type}.`);
+      break;
+  }
+};
+
 export const subscriptionServices = {
   createCheckoutSession,
+  handleWebhook,
 };
