@@ -1,3 +1,4 @@
+import Stripe from "stripe";
 import config from "../../config";
 import { prisma } from "../../lib/prisma";
 import { stripe } from "../../lib/stripe";
@@ -51,7 +52,9 @@ const handleWebhook = async (payload: Buffer, signature: string) => {
   );
   switch (event.type) {
     case "checkout.session.completed":
+      // console.log("Checkout session completed.");
       //occurs when the checkout session is completed successfully
+      await handleCheckoutCompleted(event.data.object);
       break;
     case "customer.subscription.updated":
       //occurs when the subscription is changed, for example when switching from one plan to another
@@ -63,6 +66,50 @@ const handleWebhook = async (payload: Buffer, signature: string) => {
       console.log(`Unhandled event type ${event.type}.`);
       break;
   }
+};
+
+const getPeriodEnd = (payload: Stripe.Subscription) => {
+  const currentPeriodEndInMiliSeconds =
+    payload.items.data[0]?.current_period_end!;
+  const currentPeriodEnd = new Date(currentPeriodEndInMiliSeconds * 1000);
+  return currentPeriodEnd;
+};
+
+const handleCheckoutCompleted = async (session: Stripe.Checkout.Session) => {
+  const userId = session.metadata?.userId;
+  const stripeCustomerId = session.customer as string;
+  const stripeSubscriptionId = session.subscription as string;
+  if (userId && stripeCustomerId && stripeSubscriptionId) {
+    throw new Error("Missing required metadata in the session object.");
+  }
+
+  const stripeSubscription =
+    await stripe.subscriptions.retrieve(stripeSubscriptionId);
+  const currentPeriodStart =
+    stripeSubscription.items.data[0]?.current_period_start;
+
+  const currentPeriodEnd = getPeriodEnd(stripeSubscription);
+
+  if (!userId) {
+    throw new Error("Missing userId in the session metadata.");
+  }
+
+  await prisma.subscription.upsert({
+    where: { userId },
+    create: {
+      userId,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      status: "ACTIVE",
+      currentPeriodEnd,
+    },
+    update: {
+      stripeCustomerId,
+      stripeSubscriptionId,
+      status: "ACTIVE",
+      currentPeriodEnd,
+    },
+  });
 };
 
 export const subscriptionServices = {
