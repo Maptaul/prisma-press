@@ -8,6 +8,19 @@ import {
 } from "./post.interface";
 
 const createPost = async (payload: iCreatePostPayload, userId: string) => {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: {
+      id: userId,
+    },
+    include: {
+      subscription: true,
+    },
+  });
+
+  if (payload.isPremium && user.subscription?.status !== "ACTIVE") {
+    throw new Error("Only active subscribers can create premium posts");
+  }
+
   const result = await prisma.post.create({
     data: {
       ...payload,
@@ -70,6 +83,10 @@ const getAllPosts = async (query: IPostQuery) => {
       status: query.status,
     });
   }
+
+  andConditions.push({
+    isPremium: false,
+  });
 
   const posts = await prisma.post.findMany({
     // where: {
@@ -254,6 +271,7 @@ const getPostById = async (postId: string) => {
     await tx.post.update({
       where: {
         id: postId,
+        isPremium: false,
       },
       data: {
         views: {
@@ -267,6 +285,7 @@ const getPostById = async (postId: string) => {
     const post = await tx.post.findUniqueOrThrow({
       where: {
         id: postId,
+        isPremium: false,
       },
       include: {
         author: {
