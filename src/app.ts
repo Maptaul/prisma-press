@@ -8,6 +8,7 @@ import { notFound } from "./middlewares/notFound";
 import { authRouters } from "./modules/auth/auth.route";
 import { commentRouter } from "./modules/comment/comment.route";
 import { postRouter } from "./modules/post/post.route";
+import { premiumRoutes } from "./modules/premium/premium.route";
 import { subscriptionRoutes } from "./modules/subscription/subcription.route";
 import { userRouter } from "./modules/user/user.route";
 
@@ -89,6 +90,7 @@ app.use("/api/auth", authRouters);
 app.use("/api/posts", postRouter);
 app.use("/api/comments", commentRouter);
 app.use("/api/subscription", subscriptionRoutes);
+app.use("/api/premium", premiumRoutes);
 
 app.use(notFound);
 app.use(globalErrorHandler);

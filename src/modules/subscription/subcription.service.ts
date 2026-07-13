@@ -112,7 +112,24 @@ const handleCheckoutCompleted = async (session: Stripe.Checkout.Session) => {
   });
 };
 
+const getSubscriptionStatus = async (userId: string) => {
+  const isSubscriptionExits = await prisma.subscription.findUniqueOrThrow({
+    where: { userId },
+  });
+  const isActive =
+    isSubscriptionExits.status === "ACTIVE" &&
+    isSubscriptionExits.currentPeriodEnd &&
+    new Date(isSubscriptionExits.currentPeriodEnd) > new Date();
+
+  return {
+    isActive,
+    isSubscribed: isActive,
+    currentPeriodEnd: isSubscriptionExits.currentPeriodEnd,
+  };
+};
+
 export const subscriptionServices = {
   createCheckoutSession,
   handleWebhook,
+  getSubscriptionStatus,
 };
