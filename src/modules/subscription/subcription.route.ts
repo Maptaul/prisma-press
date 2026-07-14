@@ -12,7 +12,11 @@ router.post(
 );
 
 //cancel subscription
-
+router.post(
+  "/cancel",
+  auth(Role.USER, Role.ADMIN, Role.AUTHOR),
+  subscriptionController.cancelSubscription,
+);
 
 router.post("/webhook", subscriptionController.handleWebhook);
 router.get(
