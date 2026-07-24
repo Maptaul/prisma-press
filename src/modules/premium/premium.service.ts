@@ -77,6 +77,11 @@ const getPremiumContent = async (query: IPostQuery) => {
         },
       },
       comments: true,
+      _count: {
+        select: {
+          comments: true,
+        },
+      },
     },
   });
   const totalPostCount = await prisma.post.count({
