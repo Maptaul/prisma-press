@@ -1,11 +1,14 @@
-import Stripe from "stripe";
 import config from "../../config";
 import { prisma } from "../../lib/prisma";
 import { stripe } from "../../lib/stripe";
+import {
+  handleChangeSubscription,
+  handleCheckoutCompleted,
+} from "./subcription.utils";
 
 const createCheckoutSession = async (userId: string) => {
   const transactionResult = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({
+    const user = await tx.user.findUniqueOrThrow({
       where: { id: userId },
       include: { subscription: true },
     });
@@ -14,10 +17,10 @@ const createCheckoutSession = async (userId: string) => {
     if (!stripeCustomerId) {
       // new customer creation
       const customer = await stripe.customers.create({
-        email: user?.email,
-        name: user?.name,
+        email: user.email,
+        name: user.name,
         metadata: {
-          userId: user?.id || "",
+          userId: user.id,
         },
       });
       stripeCustomerId = customer.id;
@@ -35,7 +38,7 @@ const createCheckoutSession = async (userId: string) => {
       success_url: `${config.app_url}/premium?success=true`,
       cancel_url: `${config.app_url}/payment?success=false`,
       metadata: {
-        userId: user?.id || "",
+        userId: user.id,
       },
     });
     return session.url;
@@ -52,64 +55,21 @@ const handleWebhook = async (payload: Buffer, signature: string) => {
   );
   switch (event.type) {
     case "checkout.session.completed":
-      // console.log("Checkout session completed.");
       //occurs when the checkout session is completed successfully
       await handleCheckoutCompleted(event.data.object);
       break;
     case "customer.subscription.updated":
       //occurs when the subscription is changed, for example when switching from one plan to another
+      await handleChangeSubscription(event.data.object);
       break;
     case "customer.subscription.deleted":
       //occurs when the subscription is canceled
+      await handleChangeSubscription(event.data.object);
       break;
     default:
       console.log(`Unhandled event type ${event.type}.`);
       break;
   }
-};
-
-const getPeriodEnd = (payload: Stripe.Subscription) => {
-  const currentPeriodEndInMiliSeconds =
-    payload.items.data[0]?.current_period_end!;
-  const currentPeriodEnd = new Date(currentPeriodEndInMiliSeconds * 1000);
-  return currentPeriodEnd;
-};
-
-const handleCheckoutCompleted = async (session: Stripe.Checkout.Session) => {
-  const userId = session.metadata?.userId;
-  const stripeCustomerId = session.customer as string;
-  const stripeSubscriptionId = session.subscription as string;
-  if (userId && stripeCustomerId && stripeSubscriptionId) {
-    throw new Error("Missing required metadata in the session object.");
-  }
-
-  const stripeSubscription =
-    await stripe.subscriptions.retrieve(stripeSubscriptionId);
-  const currentPeriodStart =
-    stripeSubscription.items.data[0]?.current_period_start;
-
-  const currentPeriodEnd = getPeriodEnd(stripeSubscription);
-
-  if (!userId) {
-    throw new Error("Missing userId in the session metadata.");
-  }
-
-  await prisma.subscription.upsert({
-    where: { userId },
-    create: {
-      userId,
-      stripeCustomerId,
-      stripeSubscriptionId,
-      status: "ACTIVE",
-      currentPeriodEnd,
-    },
-    update: {
-      stripeCustomerId,
-      stripeSubscriptionId,
-      status: "ACTIVE",
-      currentPeriodEnd,
-    },
-  });
 };
 
 const cancelSubscription = async (userId: string) => {
@@ -137,18 +97,27 @@ const cancelSubscription = async (userId: string) => {
 };
 
 const getSubscriptionStatus = async (userId: string) => {
-  const isSubscriptionExits = await prisma.subscription.findUniqueOrThrow({
+  const subscription = await prisma.subscription.findUnique({
     where: { userId },
   });
+
+  // a user who never subscribed is not an error, just an unsubscribed user
+  if (!subscription) {
+    return {
+      status: null,
+      isSubscribed: false,
+      currentPeriodEnd: null,
+    };
+  }
+
   const isActive =
-    isSubscriptionExits.status === "ACTIVE" &&
-    isSubscriptionExits.currentPeriodEnd &&
-    new Date(isSubscriptionExits.currentPeriodEnd) > new Date();
+    subscription.status === "ACTIVE" &&
+    new Date(subscription.currentPeriodEnd) > new Date();
 
   return {
-    isActive,
+    status: subscription.status,
     isSubscribed: isActive,
-    currentPeriodEnd: isSubscriptionExits.currentPeriodEnd,
+    currentPeriodEnd: subscription.currentPeriodEnd,
   };
 };
 
