@@ -9,7 +9,7 @@ import { authRouters } from "./modules/auth/auth.route";
 import { commentRouter } from "./modules/comment/comment.route";
 import { postRouter } from "./modules/post/post.route";
 import { premiumRoutes } from "./modules/premium/premium.route";
-import { subscriptionRoutes } from "./modules/subscription/subcription.route";
+import { subscriptionRoutes } from "./modules/subscription/subscription.route";
 import { userRouter } from "./modules/user/user.route";
 
 const app: Application = express();

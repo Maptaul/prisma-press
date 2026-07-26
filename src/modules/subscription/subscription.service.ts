@@ -4,7 +4,7 @@ import { stripe } from "../../lib/stripe";
 import {
   handleChangeSubscription,
   handleCheckoutCompleted,
-} from "./subcription.utils";
+} from "./subscription.utils";
 
 const createCheckoutSession = async (userId: string) => {
   const transactionResult = await prisma.$transaction(async (tx) => {
